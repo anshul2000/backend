@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "gkms"
+version = "0.1.0"
+description = ""
+authors = ["Wolfenstein99 <48590512+Wolfenstein99@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+django = "^4.2"
+whitenoise = {extras = ["brotli"], version = "^6.4.0"}
+gunicorn = "^20.1.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
