@@ -28,7 +28,7 @@ SECRET_KEY = 'r1&^6&owgoei856_ae7ys)&u$lhlxg&c^e+)ea!a(89w-c_%ch'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*', 'anuapi.onrender.com']
 CORS_ORIGIN_WHITELIST = [
     'http://*',
     'https://*'
@@ -36,7 +36,7 @@ CORS_ORIGIN_WHITELIST = [
 # https://docs.djangoproject.com/en/3.0/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = []
 
-#RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')if RENDER_EXTERNAL_HOSTNAME:    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')if RENDER_EXTERNAL_HOSTNAME:    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 # Application definition
 CORS_ORIGIN_ALLOW_ALL=True
