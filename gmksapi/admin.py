@@ -8,3 +8,5 @@ class AwarenessAdmin(admin.ModelAdmin):
 admin.site.register(Data)
 admin.site.register(UserContact)
 admin.site.register(Awareness, AwarenessAdmin)
+admin.site.register(Message)
+

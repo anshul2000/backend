@@ -44,3 +44,12 @@ class Awareness(models.Model):
     file=models.FileField(blank=True, null=True)
     def __str__(self):
         return str(self.event)
+
+
+class Message(models.Model):
+    id = models.AutoField(primary_key=True)
+    content = models.CharField(max_length=1000)
+    district = models.CharField(max_length=30, choices=districts)
+
+    def __str__(self):
+        return str(f'Content: {self.content}, District: {self.district}')
