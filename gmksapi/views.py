@@ -1,15 +1,21 @@
 import base64
+
+from django.views.generic import CreateView
 from rest_framework.decorators import action
 from rest_framework.renderers import BaseRenderer
 from django.shortcuts import render, redirect
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
-from django.http import HttpResponse, JsonResponse, Http404
+from django.http import HttpResponse, JsonResponse, Http404, HttpResponseRedirect
+
+from .form_data import get_phone_numbers
 from .forms import *
 from .models import *
 from django.conf import settings
 import math
 import random
+
+from twilio.rest import Client
 
 from rest_framework.parsers import JSONParser
 from .serializers import *
@@ -25,6 +31,8 @@ from wsgiref.util import FileWrapper
 from django.views.decorators.csrf import csrf_exempt
 from django.forms.models import model_to_dict
 import datetime
+
+
 # Create your views here.
 
 
@@ -32,38 +40,36 @@ import datetime
 def home(request):
     if request.method == 'POST':
         print(request.POST['loc'], request.POST['category'], request.POST['language'])
-        category=str(request.POST['category'])
+        category = str(request.POST['category'])
         language = str(request.POST['language'])
         try:
-            data=Data.objects.get(loc=request.POST['loc'],category=category.lower(), language=language.lower())
+            data = Data.objects.get(loc=request.POST['loc'], category=category.lower(), language=language.lower())
             print("Will be updated")
         except:
-            data = Data.objects.create(loc=request.POST['loc'],category=category.lower(), language=language.lower())
+            data = Data.objects.create(loc=request.POST['loc'], category=category.lower(), language=language.lower())
             print("Will be Created")
-        
+
         form = DataForm(request.POST, request.FILES, instance=data)
-        if (request.POST['loc']==''):
+        if (request.POST['loc'] == ''):
             # print("loc is dead")
-            form.data['loc']='General'
+            form.data['loc'] = 'General'
         # print(form)
         if form.is_valid():
             # file is saved
             msg = "Data Posted Successfully"
             print(msg)
-            
-            if (form.data['loc']==''):
-                form.data['loc']='General'
 
-            
+            if (form.data['loc'] == ''):
+                form.data['loc'] = 'General'
 
             print(form.data['loc'], form.data['language'])
             form.save()
-            print(form.data['loc'],form.data['category'])
+            print(form.data['loc'], form.data['category'])
             # datas = Data.objects.get(loc=form.data['loc'],category=form.data['category'])
             # print(datas)
             # print(datas['upload'])
-            return Response({'status': status.HTTP_200_OK, "msg" :msg})
-        
+            return Response({'status': status.HTTP_200_OK, "msg": msg})
+
         else:
             print(form.errors)
 
@@ -73,7 +79,7 @@ def home(request):
                 'form': form,
             }
             return Response({'errors': form.errors,
-                'form': form,})
+                             'form': form, })
     else:
         form = DataForm()
 
@@ -96,7 +102,7 @@ def data(request, pk):
         datas = Data.objects.get(loc=pk)
         print(datas)
         serializer = DataSerializer(datas)
-        print(str(get_current_site(request))+serializer.data['upload'])
+        print(str(get_current_site(request)) + serializer.data['upload'])
         string = serializer.data['upload'].split('/')
         filepath = os.path.join('media', string[2])
         with open(filepath, 'rb') as report:
@@ -115,20 +121,22 @@ class BinaryFileRenderer(BaseRenderer):
     def render(self, data, media_type=None, renderer_context=None):
         return data
 
+
 def pre(loc):
-    r=loc.split(" ")
-    if len(r)>1:
-        return(str(r[0].capitalize()+" "+r[-1].capitalize()))
-    return(str(r[0].capitalize()))
+    r = loc.split(" ")
+    if len(r) > 1:
+        return (str(r[0].capitalize() + " " + r[-1].capitalize()))
+    return (str(r[0].capitalize()))
+
 
 @api_view(('GET',))
 @action(detail=True, methods=['get'], renderer_classes=(BinaryFileRenderer,))
-def download( request, pk,location,lang, *args, **kwargs ):
-    location=pre(location)
+def download(request, pk, location, lang, *args, **kwargs):
+    location = pre(location)
     print(location)
-    print('*'*100)
-    datas = Data.objects.get(loc=location,category=str(pk).lower(),language=str(lang).lower())
-    print('*'*100)
+    print('*' * 100)
+    datas = Data.objects.get(loc=location, category=str(pk).lower(), language=str(lang).lower())
+    print('*' * 100)
     serializer = DataSerializer(datas)
     print(serializer.data['upload'])
     string = serializer.data['upload'].split('/')
@@ -141,13 +149,13 @@ def download( request, pk,location,lang, *args, **kwargs ):
 
 
 @csrf_exempt
-@api_view(('POST','GET','PUT'))
+@api_view(('POST', 'GET', 'PUT'))
 def number(request):
     if request.method == 'PUT':
-        DATA=JSONParser().parse(request)
+        DATA = JSONParser().parse(request)
 
-        a=UserContact.objects.create()
-        serializer=ContactSerializer(a,data=DATA)
+        a = UserContact.objects.create()
+        serializer = ContactSerializer(a, data=DATA)
         print(serializer)
         if serializer.is_valid():
             print(serializer.validated_data)
@@ -156,116 +164,147 @@ def number(request):
             return JsonResponse(serializer.data)
         print(serializer.errors)
         a.delete()
-        return JsonResponse(serializer.errors,status=400)
+        return JsonResponse(serializer.errors, status=400)
 
         # obj=UserContact.objects.create(number=int(request.POST['number']))
         # obj.save()
         # return Response({'status': status.HTTP_200_OK})
-    elif request.method=='GET' :
+    elif request.method == 'GET':
         contacts = UserContact.objects.all()
-        serializer = ContactSerializer(contacts, many =True)
+        serializer = ContactSerializer(contacts, many=True)
         return Response({'status': status.HTTP_200_OK, 'data': serializer.data})
-        
-from twilio.rest import Client
+
+
 @csrf_exempt
-@api_view(('POST','GET','PUT'))
+@api_view(('POST', 'GET', 'PUT'))
 def sms(request):
-    res=""
+    res = ""
     if request.method == 'GET':
-        contact=UserContact.objects.all()
+        contact = UserContact.objects.all()
         client = Client('AC2a94d3d3b15c0cfaf5a5431f0e2323b0', '1adbbd64bde6f14356a610c21059af67')
         for c in contact:
             if c.number:
                 try:
                     message = client.messages \
                         .create(
-                            body='New document uploaded on "Anumaan" website, please check.    অনুমান" ওয়েবসাইটে নতুন ডকুমেন্ট আপলোড করা হয়েছে, অনুগ্রহ করে চেক করুন।',
-                            from_='+19206587995',
-                            to="+91"+str(c.number)
-                        )
-                    
+                        body='New document uploaded on "Anumaan" website, please check.    অনুমান" ওয়েবসাইটে নতুন ডকুমেন্ট আপলোড করা হয়েছে, অনুগ্রহ করে চেক করুন।',
+                        from_='+19206587995',
+                        to="+91" + str(c.number)
+                    )
+
                     print(message.sid)
                 except:
-                    res+="+91"+str(c.number) +" is unverified at Twillo. \n"
-    
-    return Response({'status': status.HTTP_200_OK,  'response': res})
+                    res += "+91" + str(c.number) + " is unverified at Twillo. \n"
+
+    return Response({'status': status.HTTP_200_OK, 'response': res})
+
+
+class MessageCreate(CreateView):
+    model = Message
+    fields = ['content', 'district']
+
+
+# @api_view(('POST', 'GET'))
+# def new_sms(request):
+#     if request.method == 'POST':
+#         form = SMSForm(request.POST)
+#         if form.is_valid():
+#             district = form.data['district']
+#
+#             phone_numbers = get_phone_numbers(district)
+#             print(phone_numbers)
+#             for phone_number in phone_numbers:
+#                 try:
+#                     client = Client('AC255cbc363184848e2bc6991b3912862e', '6b81f11412c6b38b3821241469e70db5')
+#                     message = client.messages.create(from_='+13203078886', body=form.data['content'], to=phone_number)
+#                     print('Message status', message.status)
+#                 except:
+#                     return Response({'status': status.HTTP_400_BAD_REQUEST, 'response': 'Invalid Phone Number'})
+#             return HttpResponseRedirect("/")
+#
+#     else:
+#         form = SMSForm()
+#     return render(request, 'sms.html', {'form': form})
 
 
 @csrf_exempt
-@api_view(('POST','PUT'))
+@api_view(('POST', 'PUT'))
 def text(request):
-    res=""
+    res = ""
     # print("*"*100)
     # DATA=JSONParser().parse(request)
     # print(DATA)
     # print("*"*100)
     if request.method == 'POST':
         form = TextForm(request.POST, request.FILES)
-        text=form.data['text']
+        text = form.data['text']
         print(text)
-        contact=UserContact.objects.all()
+        contact = UserContact.objects.all()
         client = Client('AC2a94d3d3b15c0cfaf5a5431f0e2323b0', '1adbbd64bde6f14356a610c21059af67')
         for c in contact:
             if c.number:
                 try:
                     message = client.messages \
                         .create(
-                            body=str(text),
-                            from_='+19206587995',
-                            to="+91"+str(c.number)
-                        )
-                    
+                        body=str(text),
+                        from_='+19206587995',
+                        to="+91" + str(c.number)
+                    )
+
                     print(message.sid)
                 except:
-                    res+="+91"+str(c.number) +" is unverified at Twillo. \n"
-    
-    return Response({'status': status.HTTP_200_OK,  'response': res})
+                    res += "+91" + str(c.number) + " is unverified at Twillo. \n"
+
+    return Response({'status': status.HTTP_200_OK, 'response': res})
 
 
 @csrf_exempt
-@api_view(('GET','PUT'))
+@api_view(('GET', 'PUT'))
 def number2(request):
-    res=""
+    res = ""
     if request.method == 'PUT':
-        DATA=JSONParser().parse(request)
+        DATA = JSONParser().parse(request)
         client = Client('AC2a94d3d3b15c0cfaf5a5431f0e2323b0', '1adbbd64bde6f14356a610c21059af67')
-        number=DATA['number']
+        number = DATA['number']
         try:
             message = client.messages \
                 .create(
-                    body='YOur App link is : Lorem Ipsum',
-                    from_='+19206587995',
-                    to="+91"+str(number)
-                )
+                body='YOur App link is : Lorem Ipsum',
+                from_='+19206587995',
+                to="+91" + str(number)
+            )
             print(message.sid)
         except:
-            res+="+91"+str(number) +" is unverified at Twillo. \n"        
-        
-        return Response({'status': status.HTTP_200_OK,  'response': res})
+            res += "+91" + str(number) + " is unverified at Twillo. \n"
 
-    elif request.method=='GET' :
+        return Response({'status': status.HTTP_200_OK, 'response': res})
+
+    elif request.method == 'GET':
         contacts = UserContact.objects.all()
-        serializer = ContactSerializer(contacts, many =True)
+        serializer = ContactSerializer(contacts, many=True)
         return Response({'status': status.HTTP_200_OK, 'data': serializer.data})
-    
-from datetime import datetime,timedelta
+
+
+from datetime import datetime, timedelta
 from datetime import date
 
 # import time
 import time
+
+
 @csrf_exempt
-@api_view(('GET','PUT',"POST"))
+@api_view(('GET', 'PUT', "POST"))
 def awareness(request):
-    if request.method == 'POST' or request.method == 'PUT' :
+    if request.method == 'POST' or request.method == 'PUT':
         form = AwarenessForm(request.POST, request.FILES)
 
         if form.is_valid():
             msg = "Data Posted Successfully"
-            print("*"*100)
+            print("*" * 100)
             print(msg)
             form.save()
             return Response({'status': status.HTTP_200_OK})
-    
+
         else:
             print(form.errors)
 
@@ -275,23 +314,25 @@ def awareness(request):
                 'form': form,
             }
             return Response({'errors': form.errors,
-                'form': form})
-    elif request.method =="GET":
+                             'form': form})
+    elif request.method == "GET":
         print(date.today())
-        t= time.localtime()
-        current_time=time.strftime("%H:%M:%S",t)
+        t = time.localtime()
+        current_time = time.strftime("%H:%M:%S", t)
         print(current_time)
         date_threshold = date.today() - timedelta(days=10000)
-        contacts = Awareness.objects.values('id','loc','date','event','time').filter(date__gte=date_threshold).order_by('-date')
-        serializer=AwarenessSerializer(contacts,many=True)
+        contacts = Awareness.objects.values('id', 'loc', 'date', 'event', 'time').filter(
+            date__gte=date_threshold).order_by('-date')
+        serializer = AwarenessSerializer(contacts, many=True)
         print(serializer.data)
         return JsonResponse(serializer.data, safe=False)
-       
+
+
 @api_view(('GET',))
 @action(detail=True, methods=['get'], renderer_classes=(BinaryFileRenderer,))
-def awareness_download( request, id, *args, **kwargs ):
+def awareness_download(request, id, *args, **kwargs):
     print("awareness_download", id)
-    print('*'*100)
+    print('*' * 100)
     datas = Awareness.objects.get(id=id)
     serializer = AwarenessSerializer(datas)
     print(serializer.data['file'])
@@ -302,17 +343,17 @@ def awareness_download( request, id, *args, **kwargs ):
         print('success')
         report_encoded = base64.b64encode(report.read())
         return Response({'status': status.HTTP_200_OK, 'file': report_encoded})
-    
+
+
 @api_view(('GET',))
 @action(detail=True, methods=['get'], renderer_classes=(BinaryFileRenderer,))
 def event_download(request, *args, **kwargs):
     # location=pre(location)
     # print(location)
-    datas = Data.objects.get(loc="general",category="event")
+    datas = Data.objects.get(loc="general", category="event")
     serializer = DataSerializer(datas)
     string = serializer.data['upload'].split('/')
     filepath = os.path.join('media', string[2])
     with open(filepath, 'rb') as report:
         report_encoded = base64.b64encode(report.read())
         return Response({'status': status.HTTP_200_OK, 'report': report_encoded})
-
