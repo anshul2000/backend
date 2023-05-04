@@ -199,9 +199,19 @@ def sms(request):
     return Response({'status': status.HTTP_200_OK, 'response': res})
 
 
-class MessageCreate(CreateView):
-    model = Message
-    fields = ['content', 'district']
+@csrf_exempt
+@api_view(['POST',])
+def create_message(request):
+    if request.method == 'POST':
+
+        content = request.data['content']
+        district = request.data['district']
+        message = Message.objects.create(content=content, district=district)
+        message.save()
+        print('Saved')
+
+        return Response({'status': status.HTTP_200_OK})
+
 
 
 # @api_view(('POST', 'GET'))

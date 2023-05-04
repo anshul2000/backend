@@ -9,6 +9,7 @@ from .models import Message
 
 @receiver(post_save, sender=Message)
 def send_message(sender, instance, created, **kwargs):
+    print('SENDING MESSAGES')
     content = instance.content
     district = instance.district
     if created:

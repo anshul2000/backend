@@ -1,11 +1,12 @@
 import requests
 
-
 PHONE_NUMBER_FIELD_ID = 'J8aHZ7DEtoNe'
 DISTRICT_FIELD_ID = 'b63Vewm8kk97'
+
+
 def _get_responses():
     response = requests.get('https://api.typeform.com/forms/JuGMw6wE/responses', headers={
-        'Authorization': 'Bearer tfp_ERk6Z1iRTEyeHqtw6tRMmsVkPkr5U6gM2N9ub3deygMa_dKt58Dvjm6LP'}).json()
+        'Authorization': 'Bearer tfp_Dx1C2PYvNpMbSWi6ZJzqedwomTNwbjdWPC6M2FGX3GK4_3mHPUSzsw7fhaC'}).json()
 
     respones = []
     for item in response['items']:
@@ -17,9 +18,7 @@ def _get_responses():
             elif answer['field']['id'] == DISTRICT_FIELD_ID:
                 district = answer['text']
         respones.append({'phone_number': phone_number, 'district': district})
-
-
-
+    return respones
 
 
 def get_phone_numbers(district=None):
@@ -27,10 +26,5 @@ def get_phone_numbers(district=None):
     if district is not None and district != 'General':
         answers = [x for x in answers if x['district'] == district]
     phone_numbers = [x['phone_number'] for x in answers]
-
-
-
-    if district:
-        return [x.phone_number for x in Profile.objects.filter(district=district)]
-    else:
-        return [x.phone_number for x in Profile.objects.all()]
+    print('PHONE NUMBERS', phone_numbers)
+    return phone_numbers
